@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Produtos - Sistema E-commerce</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header {
+            background: #333;
+            color: white;
+            padding: 15px;
+        }
+
+        .header-content {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .logout-btn {
+            float: right;
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            cursor: pointer;
+        }
+
+        .container {
+            padding: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+            display: none;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1>Produtos Disponíveis</h1>
+            <button class="logout-btn" onclick="sair()">Sair</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="Pesquisar produtos...">
+        </div>
+
+        <div class="products-list" id="productsList"></div>
+    </div>
+
+    <script>
+        let produtos = [];
+        let carrinho = [];
+
+        async function loadProdutos() {
+            try {
+                const response = await fetch('/api/produtos');
+                const data = await response.json();
+                
+                if (data.success) {
+                    produtos = data.produtos;
+                    displayProdutos(produtos);
+                }
+            } catch (error) {
+                console.error('Erro ao carregar produtos:', error);
+            }
+        }
+
+        function displayProdutos(produtosToShow) {
+            const list = document.getElementById('productsList');
+            list.innerHTML = '';
+
+            produtosToShow.forEach(produto => {
+                const item = document.createElement('div');
+                item.className = 'product-item';
+                item.innerHTML = `
+                    <div class="product-info-left">
+                        <div class="product-name">${produto.nome}</div>
+                        <div class="product-stock">Estoque: ${produto.quantidade_estoque} unidades</div>
+                    </div>
+                    <div class="product-actions">
+                        <input type="number" class="quantity-input" value="1" min="1" max="${produto.quantidade_estoque}" id="qty-${produto.id}">
+                        <button class="add-btn" onclick="buyNow(${produto.id}, '${produto.nome}', ${produto.preco}, ${produto.quantidade_estoque})">
+                            Comprar
+                        </button>
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        async function buyNow(produtoId, nomeProduto, preco, maxQty) {
+            const qtyInput = document.getElementById(`qty-${produtoId}`);
+            const quantidade = parseInt(qtyInput.value);
+
+            if (quantidade < 1 || quantidade > maxQty) {
+                alert(`Quantidade deve ser entre 1 e ${maxQty}`);
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/compra-direta', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ produtoId, nomeProduto, quantidade, preco })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    window.location.href = '/pagamento';
+                }
+            } catch (error) {
+                console.error('Erro ao processar compra:', error);
+            }
+        }
+
+        async function logout() {
+            await fetch('/logout', { method: 'POST' });
+            window.location.href = '/';
+        }
+
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const filtered = produtos.filter(p => 
+                p.nome.toLowerCase().includes(searchTerm)
+            );
+            displayProdutos(filtered);
+        });
+
+        loadProdutos();
+    </script>
+</body>
+</html>

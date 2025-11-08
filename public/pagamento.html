@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pagamento</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header {
+            background: #333;
+            color: white;
+            padding: 15px;
+        }
+
+        .header-content {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .back-btn {
+            float: right;
+            background: #6c757d;
+            color: white;
+            padding: 8px 15px;
+            text-decoration: none;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+
+        .card {
+            border: 1px solid #ddd;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        h2 {
+            margin-top: 0;
+        }
+
+        .payment-option {
+            border: 2px solid #ddd;
+            padding: 15px;
+            margin-bottom: 10px;
+            cursor: pointer;
+        }
+
+        .payment-option:hover {
+            background: #f8f9fa;
+        }
+
+        .payment-option.selected {
+            border-color: #007bff;
+            background: #e7f3ff;
+        }
+
+        .finalize-btn {
+            width: 100%;
+            padding: 12px;
+            background: #28a745;
+            color: white;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+
+        .finalize-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .message {
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+            display: none;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1>Finalizar Compra</h1>
+            <a href="/produtos" class="back-btn">Voltar</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="message" id="messageDiv"></div>
+
+        <div class="card">
+            <h2>Forma de Pagamento</h2>
+            <div class="payment-methods">
+                <div class="payment-option" data-payment="pix" onclick="selecionarPagamento('pix')">
+                    <strong>PIX</strong> - Pagamento instantâneo
+                </div>
+
+                <div class="payment-option" data-payment="credito" onclick="selecionarPagamento('credito')">
+                    <strong>Cartão de Crédito</strong> - Parcelamento disponível
+                </div>
+
+                <div class="payment-option" data-payment="debito" onclick="selecionarPagamento('debito')">
+                    <strong>Cartão de Débito</strong> - Pagamento à vista
+                </div>
+
+                <div class="payment-option" data-payment="boleto" onclick="selecionarPagamento('boleto')">
+                    <strong>Boleto Bancário</strong> - Vencimento em 3 dias
+                </div>
+            </div>
+
+            <button class="finalize-btn" id="finalizeBtn" onclick="finalizarCompra()" disabled>
+                Confirmar Pagamento
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let formaPagamentoSelecionada = null;
+
+        async function carregarCompra() {
+            try {
+                const response = await fetch('/api/compra-direta');
+                const data = await response.json();
+                
+                if (data.success && !data.compra) {
+                    window.location.href = '/produtos';
+                }
+            } catch (error) {
+                console.error('Erro ao carregar compra:', error);
+            }
+        }
+
+        function selecionarPagamento(metodo) {
+            formaPagamentoSelecionada = metodo;
+            
+            document.querySelectorAll('.payment-option').forEach(option => {
+                option.classList.remove('selected');
+            });
+            
+            document.querySelector(`[data-payment="${metodo}"]`).classList.add('selected');
+            document.getElementById('finalizeBtn').disabled = false;
+        }
+
+        async function finalizarCompra() {
+            if (!formaPagamentoSelecionada) {
+                alert('Selecione uma forma de pagamento');
+                return;
+            }
+
+            const btn = document.getElementById('finalizeBtn');
+            btn.disabled = true;
+            btn.textContent = 'Processando...';
+
+            try {
+                const response = await fetch('/api/finalizar-compra', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ formaPagamento: formaPagamentoSelecionada })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    mostrarMensagemSucesso(data.message, data.pedidoId);
+                } else {
+                    mostrarMensagemErro(data.message);
+                    btn.disabled = false;
+                    btn.textContent = 'Confirmar Pagamento';
+                }
+            } catch (error) {
+                console.error('Erro ao finalizar compra:', error);
+                mostrarMensagemErro('Erro ao processar pagamento');
+                btn.disabled = false;
+                btn.textContent = 'Confirmar Pagamento';
+            }
+        }
+
+        function mostrarMensagemSucesso(mensagem, pedidoId) {
+            const messageDiv = document.getElementById('messageDiv');
+            messageDiv.className = 'message success';
+            messageDiv.innerHTML = `
+                <h3>${mensagem}</h3>
+                <p>Número do pedido: #${pedidoId}</p>
+                <p>Redirecionando...</p>
+            `;
+            messageDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                window.location.href = '/produtos';
+            }, 3000);
+        }
+
+        function mostrarMensagemErro(mensagem) {
+            const messageDiv = document.getElementById('messageDiv');
+            messageDiv.className = 'message error';
+            messageDiv.textContent = mensagem;
+            messageDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        carregarCompra();
+    </script>
+</body>
+</html>
